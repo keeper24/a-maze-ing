@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "mazegen"
+version = "1.0.0"
+description = "Reusable maze generation module using recursive backtracker algorithm"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Melik Karaca", email = "mekaraca@student.42.fr" },
+    { name = "Miraç Soytaş", email = "msoytas@student.42.fr" },
+]
+keywords = ["maze", "generator", "algorithm"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+]
+
+[tool.setuptools]
+py-modules = ["mazegen"]
