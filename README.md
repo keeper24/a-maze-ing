@@ -192,4 +192,4 @@ print(gen.has_pattern)   # True if maze was large enough for the pattern
 - [Spanning trees and perfect mazes — theory](https://en.wikipedia.org/wiki/Maze_solving_algorithm)
 - [Python `random` module](https://docs.python.org/3/library/random.html)
 - [Unicode box-drawing characters](https://en.wikipedia.org/wiki/Box-drawing_characters)
-- **AI usage:** Claude (Anthropic) was used to review the junction-character rendering logic and suggest the BFS solution approach. All code was written, read, and understood by the team.
+- **AI usage:** Claude (Anthropic) was consulted in a limited capacity during the early stages of the project — primarily for problem decomposition (breaking the requirements into independent components), researching maze generation algorithms, and clarifying how to approach the output format design. All code was written by the team members, reviewed, and fully understood before being integrated into the project.

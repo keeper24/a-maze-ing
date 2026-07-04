@@ -5,12 +5,21 @@ Usage::
     python3 a_maze_ing.py config.txt
 """
 
+import random
 import sys
 import os
 from typing import Optional
-from mazegen import MazeGenerator, NORTH, EAST, SOUTH, WEST
+from mazegen import (
+    MazeGenerator,
+    MIN_WIDTH,
+    MIN_HEIGHT,
+    NORTH,
+    EAST,
+    SOUTH,
+    WEST,
+    DELTA,
+)
 
-# ──────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -41,7 +50,8 @@ def parse_config(path: str) -> dict[str, str]:
                     continue
                 if "=" not in line:
                     raise ValueError(
-                        f"Config line {lineno}: expected KEY=VALUE, got: {line!r}"
+                        f"Config line {lineno}: expected KEY=VALUE, "
+                        f"got: {line!r}"
                     )
                 key, _, value = line.partition("=")
                 config[key.strip()] = value.strip()
@@ -55,7 +65,7 @@ def parse_config(path: str) -> dict[str, str]:
 
 
 def build_generator(config: dict[str, str]) -> tuple[MazeGenerator, str]:
-    """Validate config values and return a configured MazeGenerator + output path.
+    """Validate config values and return a MazeGenerator and output path.
 
     Args:
         config: Parsed config dictionary.
@@ -83,7 +93,9 @@ def build_generator(config: dict[str, str]) -> tuple[MazeGenerator, str]:
         try:
             return int(parts[0].strip()), int(parts[1].strip())
         except ValueError:
-            raise ValueError(f"{key} coordinates must be integers, got: {raw!r}")
+            raise ValueError(
+                f"{key} coordinates must be integers, got: {raw!r}"
+            )
 
     entry = parse_coord(config["ENTRY"], "ENTRY")
     exit_cell = parse_coord(config["EXIT"], "EXIT")
@@ -124,7 +136,6 @@ def build_generator(config: dict[str, str]) -> tuple[MazeGenerator, str]:
     return gen, output_file
 
 
-# ──────────────────────────────────────────────────────────────────────────────
 # Hex output
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -153,7 +164,6 @@ def write_output(gen: MazeGenerator, output_file: str) -> None:
         f.write(path_str + "\n")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
 # ASCII renderer
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -216,10 +226,45 @@ def _junction(grid: list[list[int]], r: int, c: int) -> str:
     return _JUNCTIONS.get((has_s, has_e, has_n, has_w), "+")
 
 
+# Colour schemes
+# ──────────────────────────────────────────────────────────────────────────────
+
+_RESET: str = "\033[0m"
+
+
+class ColorScheme:
+    """ANSI colour scheme for maze rendering."""
+
+    def __init__(
+        self, name: str, wall: str, path: str, entry: str, exit_c: str
+    ) -> None:
+        """Initialise with ANSI escape codes for each element."""
+        self.name = name
+        self.wall = wall
+        self.path = path
+        self.entry = entry
+        self.exit_c = exit_c
+
+
+COLOR_SCHEMES: list[ColorScheme] = [
+    ColorScheme("Default", "",         "",         "",         ""),
+    ColorScheme("Green",   "\033[32m", "\033[36m", "\033[95m", "\033[91m"),
+    ColorScheme("Yellow",  "\033[33m", "\033[36m", "\033[95m", "\033[91m"),
+    ColorScheme("Cyan",    "\033[96m", "\033[33m", "\033[95m", "\033[91m"),
+    ColorScheme("Blue",    "\033[34m", "\033[36m", "\033[95m", "\033[91m"),
+]
+
+
+def _col(text: str, code: str) -> str:
+    """Wrap text with ANSI colour code; unchanged if code is empty."""
+    return text if not code else f"{code}{text}{_RESET}"
+
+
 def render_maze(
     gen: MazeGenerator,
     show_path: bool = False,
     show_42: bool = True,
+    scheme: Optional[ColorScheme] = None,
 ) -> str:
     """Render the maze as a multi-line ASCII string.
 
@@ -227,23 +272,23 @@ def render_maze(
         gen: A MazeGenerator that has already run generate().
         show_path: If True, overlay the solution path with '*'.
         show_42: If True, shade the '42' cells with '#'.
+        scheme: Colour scheme for ANSI terminal output.
 
     Returns:
         String ready to print to the terminal.
     """
+    active = scheme if scheme is not None else COLOR_SCHEMES[0]
     grid = gen.grid
     height = gen.height
     width = gen.width
     ec, er = gen.entry
     xc, xr = gen.exit_cell
 
-    # Build path cells set
     path_cells: set[tuple[int, int]] = set()
     if show_path and gen.solution:
         col, row = gen.entry
         path_cells.add((col, row))
         dir_map = {"N": NORTH, "E": EAST, "S": SOUTH, "W": WEST}
-        from mazegen import DELTA
         for letter in gen.solution:
             dc, dr = DELTA[dir_map[letter]]
             col += dc
@@ -252,47 +297,45 @@ def render_maze(
 
     lines: list[str] = []
 
-    # Each cell takes 2 chars wide + 1 for junctions → (width*2 + 1) chars per row
-    # Each cell takes 1 char tall + 1 for junctions → (height*2 + 1) rows
-
     for r in range(height + 1):
-        line_top = ""   # junction + horizontal wall row
-        line_mid = ""   # vertical wall + cell interior row (only for r < height)
+        line_top = ""
+        line_mid = ""
 
         for c in range(width + 1):
-            # Junction character at corner (r, c)
-            line_top += _junction(grid, r, c)
+            jchar = _junction(grid, r, c)
+            line_top += _col(jchar, active.wall) if jchar != " " else " "
 
             if c < width:
-                # Horizontal segment: top wall of cell (r, c) if r < height,
-                # else bottom wall of cell (r-1, c)
                 if r < height:
                     has_top = bool(grid[r][c] & NORTH)
                 else:
                     has_top = bool(grid[r - 1][c] & SOUTH)
-                line_top += _HORIZ + _HORIZ if has_top else "  "
+                if has_top:
+                    line_top += _col(_HORIZ + _HORIZ, active.wall)
+                else:
+                    line_top += "  "
 
         lines.append(line_top)
 
         if r < height:
             for c in range(width + 1):
-                # Vertical segment: left wall of cell (r, c)
                 if c < width:
                     has_left = bool(grid[r][c] & WEST)
                 else:
                     has_left = bool(grid[r][c - 1] & EAST)
-                line_mid += _VERT if has_left else " "
+                line_mid += (
+                    _col(_VERT, active.wall) if has_left else " "
+                )
 
                 if c < width:
-                    # Cell interior
                     if (c, r) == (ec, er):
-                        interior = "S "
+                        interior = _col("S ", active.entry)
                     elif (c, r) == (xc, xr):
-                        interior = "E "
+                        interior = _col("E ", active.exit_c)
                     elif show_42 and (c, r) in gen.forty_two_cells:
                         interior = "##"
                     elif show_path and (c, r) in path_cells:
-                        interior = "* "
+                        interior = _col("* ", active.path)
                     else:
                         interior = "  "
                     line_mid += interior
@@ -302,7 +345,6 @@ def render_maze(
     return "\n".join(lines)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
 # Interactive display loop
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -311,25 +353,29 @@ def _clear() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def display_loop(gen: MazeGenerator, config: dict[str, str], output_file: str) -> None:
+def display_loop(
+    gen: MazeGenerator, config: dict[str, str], output_file: str
+) -> None:
     """Interactive loop: display maze and respond to user commands.
 
     Commands:
         r  — regenerate a new maze (new random seed)
         p  — toggle shortest-path display
+        c  — cycle wall colour scheme
         q  — quit
 
     Args:
         gen: Already-generated MazeGenerator instance.
-        config: Parsed config dictionary (for reconstructing gen on regenerate).
+        config: Parsed config (used to rebuild generator on regenerate).
         output_file: Path to write hex output.
     """
     show_path = False
-    import random as _rnd
+    color_idx: int = 0
 
     while True:
         _clear()
-        print(render_maze(gen, show_path=show_path))
+        scheme = COLOR_SCHEMES[color_idx]
+        print(render_maze(gen, show_path=show_path, scheme=scheme))
         print()
         if not gen.has_pattern:
             print("[!] Maze too small to embed '42' pattern.")
@@ -338,8 +384,12 @@ def display_loop(gen: MazeGenerator, config: dict[str, str], output_file: str) -
                 print(f"[Path shown] Length: {len(gen.solution)} steps")
             else:
                 print("[!] No solution found.")
+        print(f"[Colour: {scheme.name}]")
         print()
-        print("Commands:  [r] regenerate   [p] toggle path   [q] quit")
+        print(
+            "Commands:  [r] regenerate   [p] toggle path"
+            "   [c] cycle colour   [q] quit"
+        )
         try:
             cmd = input("> ").strip().lower()
         except (EOFError, KeyboardInterrupt):
@@ -349,7 +399,7 @@ def display_loop(gen: MazeGenerator, config: dict[str, str], output_file: str) -
         if cmd == "q":
             break
         elif cmd == "r":
-            new_seed = _rnd.randint(0, 2**31)
+            new_seed = random.randint(0, 2**31)
             gen = MazeGenerator(
                 width=gen.width,
                 height=gen.height,
@@ -366,11 +416,10 @@ def display_loop(gen: MazeGenerator, config: dict[str, str], output_file: str) -
                 input("Press Enter to continue...")
         elif cmd == "p":
             show_path = not show_path
-        else:
-            pass  # Ignore unknown commands silently
+        elif cmd == "c":
+            color_idx = (color_idx + 1) % len(COLOR_SCHEMES)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -385,16 +434,15 @@ def main() -> None:
     try:
         config = parse_config(config_path)
         gen, output_file = build_generator(config)
+        gen.generate()
     except (FileNotFoundError, ValueError) as e:
         print(f"[Error] {e}", file=sys.stderr)
         sys.exit(1)
 
-    gen.generate()
-
     if not gen.has_pattern:
         print(
             "[Warning] Maze is too small to embed the '42' pattern "
-            f"(need at least {11}x{9} cells).",
+            f"(need at least {MIN_WIDTH}x{MIN_HEIGHT} cells).",
             file=sys.stderr,
         )
 

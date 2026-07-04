@@ -66,12 +66,12 @@ _DIGIT_2: list[list[int]] = [
 # "42" occupies 5 rows x 7 cols (3+1gap+3)
 _PATTERN_ROWS: int = 5
 _PATTERN_COLS: int = 7  # 3 + 1 gap + 3
-_MIN_WIDTH: int = _PATTERN_COLS + 4   # 2-cell border on each side
-_MIN_HEIGHT: int = _PATTERN_ROWS + 4
+MIN_WIDTH: int = _PATTERN_COLS + 4   # 2-cell border on each side
+MIN_HEIGHT: int = _PATTERN_ROWS + 4
 
 
 def _build_42_mask(offset_col: int, offset_row: int) -> set[tuple[int, int]]:
-    """Return the set of (col, row) cells that form the '42' closed-cell pattern."""
+    """Return cells that form the '42' closed-wall pattern."""
     cells: set[tuple[int, int]] = set()
     for r, row in enumerate(_DIGIT_4):
         for c, val in enumerate(row):
@@ -93,7 +93,8 @@ class MazeGenerator:
         entry: (col, row) of the entry cell.
         exit_cell: (col, row) of the exit cell.
         seed: Random seed for reproducibility.
-        perfect: If True, generate a perfect maze (exactly one path between any two cells).
+        perfect: If True, generate a perfect maze (one path between
+            any two cells).
     """
 
     def __init__(
@@ -111,17 +112,20 @@ class MazeGenerator:
         self.width = width
         self.height = height
         self.entry = entry
-        self.exit_cell = exit_cell if exit_cell is not None else (width - 1, height - 1)
+        self.exit_cell = (
+            exit_cell if exit_cell is not None else (width - 1, height - 1)
+        )
         self.seed = seed
         self.perfect = perfect
 
         # grid[row][col] = bitmask of CLOSED walls (1=closed)
-        self.grid: list[list[int]] = [[ALL_WALLS] * width for _ in range(height)]
+        self.grid: list[list[int]] = [
+            [ALL_WALLS] * width for _ in range(height)
+        ]
         self.solution: list[str] = []
         self._forty_two_cells: set[tuple[int, int]] = set()
         self._has_pattern: bool = False
 
-    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
@@ -130,6 +134,7 @@ class MazeGenerator:
         rng = random.Random(self.seed)
         self._reset()
         self._place_42_pattern()
+        self.validate_entry_exit()
         self._carve_passages(rng)
         if not self.perfect:
             self._add_extra_passages(rng)
@@ -137,9 +142,15 @@ class MazeGenerator:
         self._enforce_border_walls()
         self.solution = self._bfs_solution()
 
-    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def validate_entry_exit(self) -> None:
+        '''Check if entry point is in 42 pattern'''
+        if self.entry in self._forty_two_cells:
+            raise ValueError("Entry point collides with 42 Pattern")
+        if self.exit_cell in self._forty_two_cells:
+            raise ValueError("Exit point collides with 42 Pattern")
 
     def _reset(self) -> None:
         """Reset grid to all walls closed."""
@@ -147,7 +158,7 @@ class MazeGenerator:
 
     def _place_42_pattern(self) -> None:
         """Mark cells that form the '42' as blocked (kept fully walled)."""
-        if self.width < _MIN_WIDTH or self.height < _MIN_HEIGHT:
+        if self.width < MIN_WIDTH or self.height < MIN_HEIGHT:
             self._has_pattern = False
             self._forty_two_cells = set()
             return
@@ -165,7 +176,7 @@ class MazeGenerator:
         return 0 <= col < self.width and 0 <= row < self.height
 
     def _carve_passages(self, rng: random.Random) -> None:
-        """Recursive backtracker: carve passages through the maze via iterative DFS."""
+        """Carve passages via iterative DFS (recursive backtracker)."""
         visited: list[list[bool]] = [
             [self._is_blocked(c, r) for c in range(self.width)]
             for r in range(self.height)
@@ -199,18 +210,22 @@ class MazeGenerator:
         # Ensure all non-blocked cells are reachable (connect isolated regions)
         self._connect_isolated(visited, rng)
 
-    def _find_unblocked_start(self, visited: list[list[bool]]) -> tuple[int, int]:
+    def _find_unblocked_start(
+        self, visited: list[list[bool]]
+    ) -> tuple[int, int]:
         """Find the first cell that is not blocked."""
         for r in range(self.height):
             for c in range(self.width):
                 if not visited[r][c]:
                     return c, r
-        raise RuntimeError("All cells are blocked — maze too small for the 42 pattern.")
+        raise RuntimeError(
+            "All cells are blocked — maze too small for the 42 pattern."
+        )
 
     def _connect_isolated(
         self, visited: list[list[bool]], rng: random.Random
     ) -> None:
-        """Connect any cells not reached by the initial DFS (e.g., around '42' borders)."""
+        """Connect unvisited non-blocked cells to the main spanning tree."""
         for r in range(self.height):
             for c in range(self.width):
                 if not visited[r][c] and not self._is_blocked(c, r):
@@ -243,7 +258,7 @@ class MazeGenerator:
     def _remove_wall(
         self, col: int, row: int, ncol: int, nrow: int, direction: int
     ) -> None:
-        """Remove the wall between (col, row) and its neighbour in direction."""
+        """Remove the wall between (col, row) and its neighbour."""
         self.grid[row][col] &= ~direction
         self.grid[nrow][ncol] &= ~OPPOSITE[direction]
 
@@ -253,32 +268,29 @@ class MazeGenerator:
         for _ in range(extra):
             col = rng.randint(0, self.width - 2)
             row = rng.randint(0, self.height - 1)
-            if not self._is_blocked(col, row) and not self._is_blocked(col + 1, row):
+            if (
+                not self._is_blocked(col, row)
+                and not self._is_blocked(col + 1, row)
+            ):
                 self._remove_wall(col, row, col + 1, row, EAST)
 
     def _open_border_walls(self) -> None:
         """Open the outer border wall at entry and exit cells."""
+        def _open(c: int, r: int) -> None:
+            """Open the border-facing wall of cell (c, r)."""
+            if r == 0:
+                self.grid[r][c] &= ~NORTH
+            elif r == self.height - 1:
+                self.grid[r][c] &= ~SOUTH
+            elif c == 0:
+                self.grid[r][c] &= ~WEST
+            elif c == self.width - 1:
+                self.grid[r][c] &= ~EAST
+
         ec, er = self.entry
         xc, xr = self.exit_cell
-        # Entry: open whichever border face the cell is on
-        if er == 0:
-            self.grid[er][ec] &= ~NORTH
-        elif er == self.height - 1:
-            self.grid[er][ec] &= ~SOUTH
-        elif ec == 0:
-            self.grid[er][ec] &= ~WEST
-        else:
-            self.grid[er][ec] &= ~EAST
-
-        # Exit
-        if xr == 0:
-            self.grid[xr][xc] &= ~NORTH
-        elif xr == self.height - 1:
-            self.grid[xr][xc] &= ~SOUTH
-        elif xc == 0:
-            self.grid[xr][xc] &= ~WEST
-        else:
-            self.grid[xr][xc] &= ~EAST
+        _open(ec, er)
+        _open(xc, xr)
 
     def _enforce_border_walls(self) -> None:
         """Close all outer border walls except at entry/exit openings."""
@@ -306,7 +318,7 @@ class MazeGenerator:
                 self.grid[r][self.width - 1] |= EAST
 
     def _bfs_solution(self) -> list[str]:
-        """Return shortest path from entry to exit as a list of direction letters."""
+        """Return the shortest path from entry to exit as direction letters."""
         start = self.entry
         goal = self.exit_cell
         if start == goal:

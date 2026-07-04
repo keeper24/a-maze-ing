@@ -6,5 +6,3 @@ __pycache__/
 dist/
 build/
 maze.txt
-*.whl
-*.tar.gz

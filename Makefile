@@ -22,13 +22,13 @@ clean:
 	rm -f maze.txt
 
 lint:
-	flake8 .
+	flake8 . --exclude build,dist
 	mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports \
-	       --disallow-untyped-defs --check-untyped-defs
+	       --disallow-untyped-defs --check-untyped-defs --exclude build
 
 lint-strict:
-	flake8 .
-	mypy . --strict
+	flake8 . --exclude build,dist
+	mypy . --strict --exclude build
 
 build-pkg:
 	$(PYTHON) -m build --wheel --sdist
