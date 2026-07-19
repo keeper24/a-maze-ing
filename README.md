@@ -1,10 +1,12 @@
-*This project has been created as part of the 42 curriculum by mekaraca, msoytas.*
-
 # A-Maze-ing
 
 ## Description
 
 A-Maze-ing is a maze generator written in Python 3. It reads a configuration file, generates a maze using the **recursive backtracker (DFS)** algorithm, writes the result to a hex-encoded output file, and renders the maze interactively in the terminal using ASCII box-drawing characters. Every generated maze embeds a visible **"42"** pattern formed by fully-walled cells placed at the center of the grid.
+
+
+https://github.com/user-attachments/assets/c16790b3-559f-4c20-bbfd-067d652b924a
+
 
 ## Instructions
 
@@ -157,11 +159,7 @@ print(gen.has_pattern)   # True if maze was large enough for the pattern
 
 ---
 
-## Team and project management
-
-**Team members:**
-- **Melik Karaca** (mekaraca) — maze engine, hex output, packaging
-- **Miraç Soytaş** (msoytas) — ASCII renderer, config parser, Makefile, README
+## Project Management
 
 **Planning:**
 - Phase 1: Core `MazeGenerator` class with recursive backtracker and "42" pattern
@@ -181,7 +179,6 @@ print(gen.has_pattern)   # True if maze was large enough for the pattern
 - Python 3 stdlib only (no external runtime dependencies).
 - `flake8` and `mypy` for code quality.
 - `build` for packaging.
-- AI (Claude) used to: review algorithm correctness, suggest box-drawing junction logic, draft README structure. All generated code was reviewed and understood by team members.
 
 ---
 
@@ -192,4 +189,4 @@ print(gen.has_pattern)   # True if maze was large enough for the pattern
 - [Spanning trees and perfect mazes — theory](https://en.wikipedia.org/wiki/Maze_solving_algorithm)
 - [Python `random` module](https://docs.python.org/3/library/random.html)
 - [Unicode box-drawing characters](https://en.wikipedia.org/wiki/Box-drawing_characters)
-- **AI usage:** Claude (Anthropic) was consulted in a limited capacity during the early stages of the project — primarily for problem decomposition (breaking the requirements into independent components), researching maze generation algorithms, and clarifying how to approach the output format design. All code was written by the team members, reviewed, and fully understood before being integrated into the project.
+- **AI usage:** Claude was consulted in a limited capacity during the early stages of the project — primarily for problem decomposition (breaking the requirements into independent components), researching maze generation algorithms, and clarifying how to approach the output format design. All code was written by the team members, reviewed, and fully understood before being integrated into the project.
