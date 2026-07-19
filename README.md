@@ -5,7 +5,8 @@
 A-Maze-ing is a maze generator written in Python 3. It reads a configuration file, generates a maze using the **recursive backtracker (DFS)** algorithm, writes the result to a hex-encoded output file, and renders the maze interactively in the terminal using ASCII box-drawing characters. Every generated maze embeds a visible **"42"** pattern formed by fully-walled cells placed at the center of the grid.
 
 
-https://github.com/user-attachments/assets/c16790b3-559f-4c20-bbfd-067d652b924a
+https://github.com/user-attachments/assets/95628210-8246-4d1f-a6d6-3a42f9424bf5
+
 
 
 ## Instructions
